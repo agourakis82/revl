@@ -530,11 +530,15 @@ else
 fi
 # Issue #2899: the per-tier support table's self-host emit column is a measured
 # ledger. The check is cheap (it reads the ledger, it does not re-measure) and
-# refuses only what is wrong with the ledger itself: an unacknowledged
-# non-emitting cell or a stale acknowledgement. A moved source digest is
-# reported and exits 0, the same as in CI, so the two stay in step.
+# refuses what is wrong with the ledger itself: an unacknowledged non-emitting
+# cell or a stale acknowledgement. A moved source digest alone is reported and
+# exits 0, as in CI, so main is not reddened by a merge that changes no cell. The
+# branch gate (`--base`) is the stricter half: when THIS branch edits a measured
+# input (a self-host source, a stdlib module or an emitter) and the ledger was
+# measured at a different digest, it refuses, because that branch is the one
+# with a reason to re-measure.
 if want gate conformance; then
-    step "self-host emit ledger (--check)"    "$PYTHON" tools/selfhost_matrix.py --check
+    step "self-host emit ledger (--check)"    "$PYTHON" tools/selfhost_matrix.py --check --base "${AFF_BASE:-origin/main}"
 else
     note "self-host emit ledger (--check)"
 fi
