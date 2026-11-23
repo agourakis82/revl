@@ -18,7 +18,7 @@ Sources studied, all at `c136eae6`: `tools/oracle_construct_reach.py`,
 
 A curriculum is auditable when a task can be regenerated from the tree rather
 than recalled, and when its rung is read off a measurement rather than
-asserted. `tools/evolve_curriculum.py` does both: five adapters read five of
+asserted. `tools/evolve_curriculum.py` does both: six adapters read six of
 the review's eight sources and emit one task per gap the source exhibits, each
 task carrying the repository path it was derived from, the locator inside it,
 the gap in one line, the change site, and the mechanism that decides the task
@@ -107,7 +107,7 @@ test_tier_is_a_total_function_of_the_signal` asserts that every task's rung
 equals `tier(task.signal)` and that two tasks with the same triple never carry
 different rungs, so a source cannot smuggle a difficulty in.
 
-## 3. The five adapters, and the gap each one reads
+## 3. The six adapters, and the gap each one reads
 
 ### 3.1 `construct-reach` (source: known gaps) -> medium, 244 tasks
 
@@ -228,6 +228,44 @@ directories, so the census is the mechanism the task names. Rung: hard. A task
 is emitted only if the reference still refuses the program, so a stale record
 cannot invent one, and a missing record directory returns no signal so `check`
 reds on the source instead of reading `hard` as empty.
+
+### 3.6 `fuzz-seeds` (source: generated adversarial programs) -> easy and hard
+
+Slice 5. `tools/fuzz_frontend.py` mutates the tree's own programs and runs each
+stage's oracle over the result: the reference frontend must refuse and never
+crash, the self-host lexer must agree with the reference lexer, and the
+self-host gate must not admit what the reference refuses. A campaign that finds
+a divergence shrinks it to a minimal reproducer. A reproducer nobody has fixed is
+a task, and only while it still diverges, so the curriculum replays it rather
+than trusting that it was recorded.
+
+The recorded reproducers are `tests/fixtures/fuzz_seeds.json`, one
+`{id, stage, kind, source}` per entry. The source replays each through the
+fuzzer's own `replay_seeds`, the function `python3 tools/fuzz_frontend.py
+--replay` runs, so the task's verifier and the generator cannot drift. A seed
+whose bug was fixed (the stage returns nothing), or that now trips a different
+fault (another kind), is not reported as the recorded one. Only the stages the
+ledger uses are built, because a self-host build costs seconds and an empty
+ledger must cost none.
+
+What each stage makes agree is read off the stage classes by AST: a stage that
+builds a self-host module compares it with the reference, one that does not
+checks the reference alone. Nothing says which stage is hard. The `reference`
+stage therefore lands on easy (one implementation, no corpus to compare over) and
+the `lexer` and `gate` stages on hard (two implementations over the fuzzer's own
+`CORPUS_DIRS`, 7 directories). A missing ledger is an error and an unknown stage
+is an error.
+
+At the slice-5 commit the ledger is **empty**: a campaign of 2534 inputs on the
+gate stage (seed 1, 359 seconds) found no divergence, and the existing smoke
+test in `tests/test_fuzz_frontend.py` is green. That is a measurement of the
+tree, not a source that stopped reading, so it is an empty reachable rung, which
+is what section 4.3 allows and why the source declares both its rungs before it
+replays anything. It is stated here rather than hidden because the slice's
+acceptance ("shows tasks from that source") cannot be met by inventing a
+divergence; it is met by the constructed demonstration, a stage whose bug is a
+marker and a ledger the test owns
+(`test_a_seed_is_a_task_only_while_it_still_diverges`).
 
 ## 4. Non-vacuity: the tasks, and the gate
 
@@ -432,7 +470,7 @@ before it does.
 
 ## 6. Slice plan
 
-Slices 1 and 3 are landed. Each later slice states the source it adds, the rung
+Slices 1, 3 and 5 are landed. Each later slice states the source it adds, the rung
 it is expected to land on, and the oracle that would catch it going vacuous.
 
 | slice | source added | expected rung | fixture / oracle |
@@ -441,7 +479,7 @@ it is expected to land on, and the oracle that would catch it going vacuous.
 | 2 | the `compile` and `gate_census` oracles of `tools/oracle_construct_reach.py`, once issue #1203's fix for the `_ir_reach` string-value defect in section 3.1 has landed | medium | the same reach report, read through its shrink-only ledger |
 | 3 (landed) | cross-tier differential probes: the `examples/rejections/` programs the census parks in `no-objection-out-of-slice`, which the lower oracle's `REJECTED_PROGRAMS` cannot carry yet | hard | the committed census record; `tests/test_selfhost_lower.py` for the oracle, and a task must name a program the reference refuses and the port does not (section 3.5) |
 | 4 | design documents: a slice table row in `docs/design/*.md` whose named oracle does not exist in `tests/` | varies with the oracle named | the doc's own slice table; the gap is checkable by looking for the test file |
-| 5 | generated adversarial programs: `tools/fuzz_frontend.py` seeds that survive to a divergence | hard | the fuzz corpus; a seed is only a task while it still diverges |
+| 5 (landed) | generated adversarial programs: `tools/fuzz_frontend.py` seeds that survive to a divergence | easy (`reference` stage), hard (`lexer`, `gate`) | `tests/fixtures/fuzz_seeds.json` replayed by `fuzz_frontend.py --replay`; a seed is only a task while it still diverges (section 3.6) |
 | 6 | the tracker | varies | offline snapshot only, so the curriculum stays computable in a checkout with no network |
 | 7 | mutation testing, which the issue is right that this tree does not have | expert | see section 7 |
 
@@ -460,7 +498,7 @@ the *subject* and asks whether the suite notices. They fail on different things
 and only the second is a difficulty signal, because it measures whether the
 suite that scores a candidate is sensitive enough to be worth scoring against.
 
-Slices 1 and 3 do not add it, and do not pretend to. It is slice 7 because it is
+Slices 1, 3 and 5 do not add it, and do not pretend to. It is slice 7 because it is
 the one source whose machinery does not exist, and because it interacts with
 issue #1207: a mutation test a candidate can read is not a hidden mutation
 test, so where the mutants live is that item's question and not this one's.
@@ -470,11 +508,11 @@ test, so where the mutants live is that item's question and not this one's.
 - It does not claim the four rungs are equally hard, or that the ladder is
   calibrated against anything. Section 5 is the measurement, and it is
   negative on both proxies the tree offers.
-- It does not claim to read all eight sources. It reads five. The other three
-  sources are slices 4 (design documents), 5 (fuzz seeds) and 6 (the tracker),
-  each with a named oracle; slice 2 is an extra oracle, not one of the eight.
+- It does not claim to read all eight sources. It reads six. The other two
+  sources are slices 4 (design documents) and 6 (the tracker), each with a named
+  oracle; slice 2 is an extra oracle, not one of the eight.
 - It does not claim the derived tasks are a complete list of what is wrong with
-  the tree. They are the gaps five artifacts exhibit, no more.
+  the tree. They are the gaps six artifacts exhibit, no more.
 - It does not touch the reward (issue #1206) or the held-out scoring set
   (issue #1207). A curriculum task names a mechanism that verifies it; whether
   that mechanism is one the candidate could read is #1207's question, and every
