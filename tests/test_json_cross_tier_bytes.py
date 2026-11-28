@@ -105,6 +105,13 @@ CORPUS = [
     ("opt_member_present",
      'type R = { a: Opt[Str], c: Str }\nfn v() -> R { return { a: Some("x"), c: "y" } }',
      r'{"a":"x","c":"y"}'),
+    ("opt_nested_record_with_bigint",
+     "type Inner = { absent: Opt[Str], present: Opt[Bool] }\n"
+     "type R = { inner: Inner, n: Int }\n"
+     "fn v() -> R {\n"
+     "  return { inner: { absent: None, present: Some(false) }, n: 9007199254740993 }\n"
+     "}",
+     r'{"inner":{"absent":null,"present":false},"n":9007199254740993}'),
     ("opt_top_level_none", 'fn v() -> Opt[Str] { return None }', r'null'),
     ("opt_top_level_some", 'fn v() -> Opt[Str] { return Some("x") }', r'"x"'),
     ("list_opt_mixed", 'fn v() -> List[Opt[Int]] { return [Some(1), None] }',
